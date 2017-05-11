@@ -1,11 +1,57 @@
 \section{Introduction}
 
-Python is an object oriented programing language.
-It is a common practice for programmers to encapsulate state and logic using classes in Python programs.
-As an implementation of the Python language, it is essential for us to ensure the performance of object operations and method calls in ZipPy.
-In this paper we explain how we implement object operations and calls in ZipPy.
+% object model is critical
+All data is presented as object in mainstream dynamic languages like Python, Ruby and JavaScript.
+Programs written in those languages interact with data using objects.
+Object model, the implementation behind the object representation is a core component of a language runtime implementation.
+Not only it has to be efficient for accessing the reperesented data, it also needs to respect the dynamic nature of those languages.
+An efficient dynamic language implementation should handled object modifications at runtime in less expensive ways.
 
-\section{The Body of The Paper}
+% hosted language is the trend
+Despite their popularity, performance has been the weakness of dynamic languages.
+Languages like Python and Ruby are originally implemented as interpreters.
+Although interpreters are easy to implement, their performance is suboptimal.
+To address this weakness, we have seen previous works that have improved the performance of dynamic languages
+by constructing a complete just-in-time (JIT) compilation based virtual machine for one particular language.
+This approach offers promising performance benefit, but incurs significant implementation costs.
+
+Alternatively, language implementors can build their languages on top of an existing mature virtual machine such as the Java Virtual machine (JVM).
+In this way, the ``guest'' language can reuse the existing components of the ``hosting'' virtual machine to alleviate its implementation costs.
+It also provide the opportunity for the ``hosted'' language to take advantage of the underlying JIT compiler to address its performance issue.
+We explore the performance potential of ``hosted'' interpreters for dynamic languages.
+We do so by hosting a ``highly dynamic'' language (Python) on the JVM, a VM for ``moderately dynamic'' languages.
+
+% existing hosted object model has drawbacks
+We found that existing hosted dynamic languages have not addressed their object model in an efficient way.
+Jython, a JVM based Python implementation replicate the same object model design we saw in CPython to Java.
+This approach failed to identify the strength of the underlying VM.
+It relies on the assumption that the underlying JIT is powerful enough to optimize any type of program.
+Truffle's object model framwork provided an efficient way for guest langauge developer to quickly build a performant object model.
+It makes use of highly efficient constructs provided by the ``hosting'' VM.
+However it's design uses a fixed object storage layout, which often trades space for performance.
+In practice, this approach addes unnecessary pressure to the garbage collector when running programs allocates object frequently.
+
+% our extension to that
+In this paper, we propose an improved object model for hosted dynamic languages.
+It addresses the performance and space drawbacks of the existing works.
+We demonstrate our technique using our own full-fledged prototype implementation of Python 3, called ZipPy\footnote{Publicly available at \url{https://bitbucket.org/ssllab/zippy}}, which targets the Java virtual machine (JVM).
+ZipPy uses the Truffle framework to optimize interpreted programs in stages, first collecting type feedback in the AST interpreter, then just-in-time compiling an AST down to optimized machine code.
+
+\noindent{}Our contributions are:
+
+\begin{itemize}
+
+\item We present an efficient object model implementation for hosted dynamic languages.
+
+\item We introduce \emph{flexible object layout evolution}, a new technique our system uses to minimize space overheads incurred by object model.
+
+\item We provide results of a careful and detailed evaluation of our optimization and report:
+  \begin{itemize}
+  \item an average saving of xxx over the fixed storage baseline.
+  \end{itemize}
+\end{itemize}
+
+\section{Background}
 Typically, the body of a paper is organized into a hierarchical
 structure, with numbered or unnumbered headings for sections,
 subsections, sub-subsections, and even smaller sections.  The command
