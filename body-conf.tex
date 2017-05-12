@@ -52,43 +52,120 @@ ZipPy uses the Truffle framework to optimize interpreted programs in stages, fir
 \end{itemize}
 
 \section{Background}
-Typically, the body of a paper is organized into a hierarchical
-structure, with numbered or unnumbered headings for sections,
-subsections, sub-subsections, and even smaller sections.  The command
-\texttt{{\char'134}section} that precedes this paragraph is part of
-such a hierarchy.\footnote{This is a footnote.} \LaTeX\ handles the
-numbering and placement of these headings for you, when you use the
-appropriate heading commands around the titles of the headings.  If
-you want a sub-subsection or smaller part to be unnumbered in your
-output, simply append an asterisk to the command name.  Examples of
-both numbered and unnumbered headings will appear throughout the
-balance of this sample document.
 
-Because the entire article is contained in the \textbf{document}
-environment, you can indicate the start of a new paragraph with a
-blank line in your input file; that is why this sentence forms a
-separate paragraph.
+In Python all data is an object.
+CPython, the original implementation of Python, constructs every data type in Python as a heap allocated data structure.
+Since it is written in C, CPython implements Python built-in data types using C struct and user defined types using hash maps.
+This model results in expensive arithmetic operations due to frequent accesses and allocations of data structures in the heap.
+Hash map based object model is also inefficient.
+Although the cost of hash map operations is amortized for large data sets, the overhead of retrieving or updating a single map entry is still expensive.
+In a hash map based object model, retrieving the value of an object field, or an object attribute in Python, is equivalent to reading the value of a map entry.
+This operation involves a hashing calculation and a few steps of memory accesses before reaching the memory address that stores the target value.
+On the other hand, in a traditional programming language like Java, an object field access, if optimized, is simply a single memory read.
+In summary, object model inefficiency is the main impediment to the performance of popular dynamic languages like Python.
 
-\subsection{Type Changes and {\itshape Special} Characters}
+\subsection{Jython's Object Model Design}
 
-We have already seen several typeface changes in this sample.  You can
-indicate italicized words or phrases in your text with the command
-\texttt{{\char'134}textit}; emboldening with the command
-\texttt{{\char'134}textbf} and typewriter-style (for instance, for
-computer code) with \texttt{{\char'134}texttt}.  But remember, you do
-not have to indicate typestyle changes when such changes are part of
-the \textit{structural} elements of your article; for instance, the
-heading of this subsection will be in a sans serif\footnote{Another
-  footnote here.  Let's make this a rather long one to see how it
-  looks.} typeface, but that is handled by the document class file.
-Take care with the use of\footnote{Another footnote.}  the
-curly braces in typeface changes; they mark the beginning and end of
-the text that is to be in the different typeface.
+Existing JVM based Python implementations like Jython, however, replicate the same object model design we saw in CPython.
+The main approach they took is porting the existing design from C to Java hoping that the underlying Java compiler will magically optimize it.
+This approach failed to realize that, although, the Java JIT compiler is powerful, its strength is in compiling and optimizing programs written in Java,
+the first class citizen of the JVM.
+Hence, without additional knowledge to the guest language, the Java compiler is unable to address the miss match between the object model of the guest language and Java in an efficient way.
+A more efficient solution requires identifying the strengths of the Java compiler and mapping critical components of the guest language onto efficient constructs offered of the JVM.
+In the rest of this Section, we describe how we close the gap between the object models of Python and the JVM in ZipPy.
 
-You can use whatever symbols, accented characters, or non-English
-characters you need anywhere in your document; you can find a complete
-list of what is available in the \textit{\LaTeX\ User's Guide}
-\cite{Lamport:LaTeX}.
+\subsection{Python on Truffle}
+
+\begin{figure*}[!ht]
+\centering
+\includegraphics[scale=0.50]{figures/python-on-truffle.pdf}
+\caption{Python on Truffle}
+\label{fig:python_on_truffle}
+\end{figure*}
+
+In principle, ``everything'' can change at any moment in dynamic language programs.
+This dynamic nature is the major impediment to ahead-of-time optimization.
+In practice, however, programmers tend to minimize the rate of change, which makes the code highly predictable.
+Types, for instance, typically remain stable between successive executions of a particular operation instance.
+Deutsch and Schiffman report that speculative type specialization succeeds 95\% of the time in their classic Smalltalk-80 implementation~\cite{Deutsch1984}.
+
+Truffle is a self-optimizing runtime system that makes it easy to perform type specialization for dynamic languages running on top of the Java Virtual Machines (JVM)~\cite{Wurthinger+13}.
+It allows language implementers to implement their guest language by writing an AST interpreter using Java.
+An interpreter written in this way enjoys low cost type specialization via automatic node rewriting~\cite{Wurthinger+12,Brunthaler2010inca,Brunthaler2010quickening}.
+AST node rewriting collects runtime type information, and speculatively replaces the existing nodes with specialized and more efficient ones.
+Subsequently, Truffle just-in-time compiles the specialized AST, written in Java, directly to machine code using the underlying Java compiler.
+Upon a type mis-speculation, the specialized AST node handles the type change by replacing itself with a more generic one.
+The node replacement triggers deoptimization from the compiled code and transfers execution back to the interpreter.
+If the re-specialized AST stays stable, Truffle can again compile it to machine code.
+
+Our system, ZipPy, is a full-fledged prototype Python 3 implementation built atop Truffle.
+It leverages Truffle's type specialization feature and its underlying compilation infrastructure (see Figure~\ref{fig:python_on_truffle}).
+This architecture helps ZipPy outperform Python implementations that either do not exploit runtime type specialization or lack a just-in-time compiler.
+However, Truffle has no knowledge about specific high level guest language semantics, like generators in Python.
+Further performance exploration of a guest language will mainly benefit from better insights on distinct features of the language and making better use of the host compiler based on those insights.
+In this paper we focus on guest language level optimizations we added to ZipPy.
+
+\section{ZipPy's Object Model Design}
+
+\begin{figure}
+\centering
+\includegraphics[scale=.34]{figures/three-data-representations}
+\caption{Three data representations for Python objects}
+\label{fig:three-data-representations}
+\end{figure}
+
+Python, although being a dynamic language, has a rich set of built-in types that are backed by C structs.
+These types are inherently immutable.
+Meaning that Python programs cannot add or remove attributes to or from it at runtime.
+This feature separates it from languages like Ruby where you can monkey patch core classes of the language.
+But it does offer opportunities for the language implementations like ZipPy to model immutable built-in types in a more efficient way.
+Custom types defined in Python level are dynamic and mutable.
+They can be as expected manipulated as map or dictionaries at runtime.
+In the rest of this Section, we explain how we model them efficiently in ZipPy.
+
+Python does offer more advanced features like metaclasses and attribute access customizations.
+They do make the use of the language even more dynamic.
+However, in this paper we donot focus on those advanced features.
+
+\subsection{Multiple Data Representations}
+
+ZipPy internally uses multiple data representations to model Python objects.
+Figure~\ref{fig:three-data-representations} illustrates this design scheme.
+The descriptions of each data representation are as follows:
+
+\begin{enumerate}
+
+\item \textbf{Built-in numeric types}
+ZipPy, as explained in Chapter~, models some built-in numeric types, like \texttt{bool}, \texttt{int} and \texttt{float}, using Java primitives.
+This approach helps to achieve Java level performance for arithmetic operations in ZipPy.
+We refer types that has a Java primitive representation as \emph{unboxable}.
+Each \emph{unboxable} numeric type in ZipPy has a corresponding \emph{boxed} representation using Java objects as a fall-back.
+As shown in the Figure, a boxing operation will convert an instance of unboxable type, e.g., \texttt{int}, from its Java primitive representation to the boxed one.
+
+\item \textbf{Built-in immutable types}
+Similar to Jython, we implement Python built-in types including numeric types as regular Java classes.
+In this way we map Python's built-in type hierarchy onto a Java class based type hierarchy.
+Unlike custom types, all built-in types in Python are immutable meaning that user program cannot modify the attributes of an instance of a built-in type.
+We take advantage of this immutability by modeling Python built-in types directly using Java classes on the JVM.
+
+\item \textbf{Custom mutable types}
+All custom or user defined types in Python are mutable.
+That includes Python modules, custom type definitions written in Python and instances of custom classes.
+We model them using still a regular Java object, an instance of \texttt{PythonObject} in ZipPy, to circumvent the performance overhead incurred by using a hash map.
+ZipPy maps Python attribute accesses to field accesses on the \texttt{PythonObject} object.
+We support attribute modifications by maintaining an object layout table for each Python object.
+The object layout table keeps track of the memory offset for each attribute that is currently stored on the object.
+We will discuss how we support attribute modifications on custom types in more detail in Section~.
+
+\end{enumerate}
+
+Although we model Python objects using different physical data representations, our approach preserve the semantics that every data in Python is an object.
+ZipPy support object like operations on each of the data representations described above.
+What differs our approach to the existing ones is that we do not treat all Python data types in the same way.
+We try to pick the most efficient construct offered by the JVM that is suitable for implementing particular types in Python.
+To be more specific, modeling Python numbers as Java primitives enables the best arithmetics performance achievable on the JVM.
+Using Java object to model Python object brings the opportunity for ZipPy to close the performance gap of object operations between existing implementations of Python and Java.
+
 
 \subsection{Math Equations}
 You may want to display math equations in three distinct styles:
@@ -103,7 +180,7 @@ invoked with the usual \texttt{{\char'134}begin\,\ldots{\char'134}end}
 construction or with the short form \texttt{\$\,\ldots\$}. You
 can use any of the symbols and structures,
 from $\alpha$ to $\omega$, available in
-\LaTeX~\cite{Lamport:LaTeX}; this section will simply show a
+\LaTeX; this section will simply show a
 few examples of in-text equations in context. Notice how
 this equation:
 \begin{math}
@@ -138,16 +215,15 @@ and follow it with another numbered equation:
 just to demonstrate \LaTeX's able handling of numbering.
 
 \subsection{Citations}
-Citations to articles~\cite{bowman:reasoning,
-clark:pct, braams:babel, herlihy:methodology},
-conference proceedings~\cite{clark:pct} or maybe
-books \cite{Lamport:LaTeX, salas:calculus} listed
+Citations to articles,
+conference proceedings or maybe
+books listed
 in the Bibliography section of your
 article will occur throughout the text of your article.
 You should use BibTeX to automatically produce this bibliography;
 you simply need to insert one of several citation commands with
 a key of the item cited in the proper location in
-the \texttt{.tex} file~\cite{Lamport:LaTeX}.
+the \texttt{.tex} file.
 The key is a short reference you invent to uniquely
 identify each work; in this sample document, the key is
 the first author's surname and a
@@ -158,7 +234,7 @@ The details of the construction of the \texttt{.bib} file
 are beyond the scope of this sample document, but more
 information can be found in the \textit{Author's Guide},
 and exhaustive details in the \textit{\LaTeX\ User's
-Guide} by Lamport~\shortcite{Lamport:LaTeX}.
+Guide} by Lamport.
 
 
 This article shows only the plainest form
@@ -222,7 +298,7 @@ in the printed output of this document.
 \end{table*}
 % end the environment with {table*}, NOTE not {table}!
 
-It is strongly recommended to use the package booktabs~\cite{Fear05}
+It is strongly recommended to use the package booktabs
 and follow its main principles of typography with respect to tables:
 \begin{enumerate}
 \item Never, ever use vertical rules.
@@ -306,7 +382,7 @@ The pre-defined theorem-like constructs are \textbf{theorem},
 \textbf{conjecture}, \textbf{proposition}, \textbf{lemma} and
 \textbf{corollary}.  The pre-defined de\-fi\-ni\-ti\-on-like constructs are
 \textbf{example} and \textbf{definition}.  You can add your own
-constructs using the \textsl{amsthm} interface~\cite{Amsthm15}.  The
+constructs using the \textsl{amsthm} interface.  The
 styles used in the \verb|\theoremstyle| command are \textbf{acmplain}
 and \textbf{acmdefinition}.
 
