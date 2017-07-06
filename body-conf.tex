@@ -29,7 +29,7 @@ It relies on the assumption that the underlying JIT is powerful enough to optimi
 Truffle's object model framwork provided an efficient way for guest langauge developer to quickly build a performant object model.
 It makes use of highly efficient constructs provided by the ``hosting'' VM.
 However it's design uses a fixed object storage layout, which often trades space for performance.
-In practice, this approach addes unnecessary pressure to the garbage collector when running programs allocates object frequently.
+In practice, this approach puts undesired pressure onto the garbage collector when running programs allocating a large number of objects.
 
 % our extension to that
 In this paper, we propose an improved object model for hosted dynamic languages.
