@@ -157,7 +157,7 @@ We model them using still a regular Java object, an instance of \texttt{PythonOb
 ZipPy maps Python attribute accesses to field accesses on the \texttt{PythonObject} object.
 We support attribute modifications by maintaining an object layout table for each Python object.
 The object layout table keeps track of the memory offset for each attribute that is currently stored on the object.
-We will discuss how we support attribute modifications on custom types in more detail in Section~.
+We will discuss how we support attribute modifications on custom types in more detail in Section~\ref{sec:bg-custom-mutable-types}.
 
 \end{enumerate}
 
@@ -199,6 +199,7 @@ For instance, it tries to store a Java \texttt{int} in an \texttt{int} field whe
 If all \texttt{int} fields are taken, it tries to stores the attribute in an \emph{boxed} location or an object field.
 If no in-object location is available anymore (taken by other attributes), ZipPy will spill the incoming attribute to be stored in the additional object array (field \texttt{objectArray} in Figure~\ref{fig:bg-fixed-python-object-code}).
 The additional object array gives the fixed \texttt{PythonObject} the ability to store more attributes than its own capacity by paying the price of another level of direction and possibly auto-boxing.
+The fixed storage approach is similar to W\"{o}\ss' work on their Truffle-based JavaScript implementation~\cite{WoB+2014}, which is inspired by the hidden-class technique used in Google's V8~\cite{v8}.
 
 An object layout attached to a \texttt{PythonObject} keeps track of the list of attributes stored on the object as well as the location of each attribute.
 It is essentially a table that maps the symbol of an attribute to its location.
@@ -755,7 +756,7 @@ In flexible object storage with continuous generation, we always generate a new 
 
 \begin{figure*}
 \centering
-\includegraphics[scale=.3, page=4]{benchmarks/object-model-results}
+\includegraphics[scale=.25, page=4]{benchmarks/object-model-results}
 \caption{Detailed speedups of different object model configurations normalized to fixed object storage of size $5$}
 \label{fig:eval-object-model-config-speedup}
 \end{figure*}
@@ -794,14 +795,14 @@ The additional memory access incurred by accessing the spill array causes a slow
 
 \begin{figure}
 \centering
-\includegraphics[scale=.27, page=5]{benchmarks/object-model-results}
+\includegraphics[scale=.24, page=5]{benchmarks/object-model-results}
 \caption{The memory overheads of fixed object storage of size $1$, $3$ and $5$ relative to flexible storage allocation with continuous generation}
 \label{fig:eval-fixed-object-storage-space-overhead}
 \end{figure}
 
 \begin{figure}
 \centering
-\includegraphics[scale=.27, page=6]{benchmarks/object-model-results}
+\includegraphics[scale=.24, page=6]{benchmarks/object-model-results}
 \caption{The slowdowns of fixed object storage of size $1$, $3$ and $5$ relative to flexible storage allocation with continuous generation}
 \label{fig:eval-fixed-object-storage-slowdown}
 \end{figure}
@@ -850,6 +851,9 @@ The reordering can hoist the cache entry created for the newer generation storag
 However, we found in our tests that the benefit of this optimization is input dependent or program behavior dependent.
 Some programs access the older storage classes more often, whereas the other programs tend to access the newer ones.
 Thus, in our experiments, the benefit of using cache entry reordering is inconclusive.
+
+\section{Related Works}
+\label{sec:related-works}
 
 \section{Conclusions}
 This paragraph will end the body of this sample document.
