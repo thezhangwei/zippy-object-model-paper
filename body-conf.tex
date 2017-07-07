@@ -1,4 +1,5 @@
 \section{Introduction}
+\label{sec:intro}
 
 % object model is critical
 All data is presented as object in mainstream dynamic languages like Python, Ruby and JavaScript.
@@ -52,6 +53,7 @@ ZipPy uses the Truffle framework to optimize interpreted programs in stages, fir
 \end{itemize}
 
 \section{Background}
+\label{sec:background}
 
 In Python all data is an object.
 CPython, the original implementation of Python, constructs every data type in Python as a heap allocated data structure.
@@ -136,7 +138,7 @@ The descriptions of each data representation are as follows:
 \begin{enumerate}
 
 \item \textbf{Built-in numeric types}
-ZipPy, as explained in Chapter~, models some built-in numeric types, like \texttt{bool}, \texttt{int} and \texttt{float}, using Java primitives.
+ZipPy models some built-in numeric types, like \texttt{bool}, \texttt{int} and \texttt{float}, using Java primitives~\cite{Zhang+2014}.
 This approach helps to achieve Java level performance for arithmetic operations in ZipPy.
 We refer types that has a Java primitive representation as \emph{unboxable}.
 Each \emph{unboxable} numeric type in ZipPy has a corresponding \emph{boxed} representation using Java objects as a fall-back.
@@ -167,20 +169,20 @@ To be more specific, modeling Python numbers as Java primitives enables the best
 Using Java object to model Python object brings the opportunity for ZipPy to close the performance gap of object operations between existing implementations of Python and Java.
 
 \subsection{Modeling Custom Mutable Types}
-\label{sec:ch5-custom-mutable-types}
+\label{sec:bg-custom-mutable-types}
 
 \begin{figure}
 \centering
 \includegraphics[scale=.7]{figures/fixed-python-object-code}
 \caption{The implementation of \texttt{PythonObject}}
-\label{ch5-fixed-python-object-code}
+\label{fig:bg-fixed-python-object-code}
 \end{figure}
 
 \begin{figure}
 \centering
 \includegraphics[scale=.34]{figures/mutable-object-layout-change}
 \caption{Mutable object layout}
-\label{ch5-mutable-object-layout-change}
+\label{fig:bg-mutable-object-layout-change}
 \end{figure}
 
 Python allows programmers to add, modify or delete attributes on an object during the execution of the program.
@@ -188,20 +190,20 @@ On the other hand, a Java object is fixed.
 You can modify the value of a field, but cannot resize or change the layout of an object.
 We support this dynamic feature of Python by implementing each Python object using a combination of a fixed \texttt{PythonObject} and a re-sizable object layout.
 
-Figure~\ref{ch5-fixed-python-object-code} shows an implementation of \texttt{PythonObject} in ZipPy.
+Figure~\ref{fig:bg-fixed-python-object-code} shows an implementation of \texttt{PythonObject} in ZipPy.
 Each \texttt{PythonObject} has a fixed number of fields of both primitive and reference types to accommodate its attributes.
 Each field on the object is a \emph{location}.
 The object stores each of its attribute on a dedicated \emph{location}.
 ZipPy tries to store an unboxed attribute in an unboxed location to avoid the overhead of boxing.
 For instance, it tries to store a Java \texttt{int} in an \texttt{int} field when possible.
 If all \texttt{int} fields are taken, it tries to stores the attribute in an \emph{boxed} location or an object field.
-If no in-object location is available anymore (taken by other attributes), ZipPy will spill the incoming attribute to be stored in the additional object array (field \texttt{objectArray} in Figure~\ref{ch5-fixed-python-object-code}).
+If no in-object location is available anymore (taken by other attributes), ZipPy will spill the incoming attribute to be stored in the additional object array (field \texttt{objectArray} in Figure~\ref{fig:bg-fixed-python-object-code}).
 The additional object array gives the fixed \texttt{PythonObject} the ability to store more attributes than its own capacity by paying the price of another level of direction and possibly auto-boxing.
 
 An object layout attached to a \texttt{PythonObject} keeps track of the list of attributes stored on the object as well as the location of each attribute.
 It is essentially a table that maps the symbol of an attribute to its location.
 The table records modifications made dynamically to the attributes of the object.
-Figure~\ref{ch5-mutable-object-layout-change} illustrates how this process works by using a hypothetical Python object.
+Figure~\ref{fig:bg-mutable-object-layout-change} illustrates how this process works by using a hypothetical Python object.
 The layout of the shown object goes through the following stages:
 
 \begin{enumerate}
@@ -219,7 +221,7 @@ It also update the layout table to reflect the new changes.
 
 \end{enumerate}
 
-We simplified the structure of the Python object shown in Figure~\ref{ch5-mutable-object-layout-change} for brevity.
+We simplified the structure of the Python object shown in Figure~\ref{fig:bg-mutable-object-layout-change} for brevity.
 The actual algorithm for a layout update is more complicated.
 Adding or deleting an attribute triggers a layout update.
 The layout update tries to stores as many unboxed attributes in an unboxed location as possible.
@@ -239,35 +241,35 @@ Since we model class objects in the same way as we do for regular objects in Pyt
 
 \subsection{Inline Caching for Attribute Accesses}
 
-As explained in Section~\ref{sec:ch5-custom-mutable-types}, the layout table stores the location of object attributes.
+As explained in Section~\ref{sec:bg-custom-mutable-types}, the layout table stores the location of object attributes.
 Accessing an attribute requires looking up its location information from the layout table and then performing a memory read or write at the obtained memory location.
 Since we implement the layout table using a hash map, the cost of accessing the table is as expensive as attribute accesses on a hash map based object.
 However, ZipPy optimizes attribute accesses by caching attribute locations after a full layout table lookup.
 This technique, inspired by previous research on virtual machines~\cite{Deutsch1984, Holzle+1991, Brunthaler2010inca}, amortizes the cost of accessing the same attribute on the Python objects of the same type.
 
 \subsubsection{Attribute Access Dispatch Chain}
-\label{sec:ch5-attribute-access-dispatch-chain}
+\label{sec:bg-attribute-access-dispatch-chain}
 
 \begin{figure}
 \centering
 \subfigure[Structure of \texttt{GetAttributeNode}]{
   \includegraphics[scale=.4]{figures/get-attribute-node}
-  \label{fig:ch5-get-attribute-node}
+  \label{fig:bg-get-attribute-node}
 }
 \subfigure[Structure of \texttt{SetAttributeNode}]{
   \includegraphics[scale=.4]{figures/set-attribute-node}
-  \label{fig:ch5-set-attribute-node}
+  \label{fig:bg-set-attribute-node}
 }
 \caption{Attribute access dispatch chain}
-\label{fig:ch5-attribute-access-dispatch-chain}
+\label{fig:bg-attribute-access-dispatch-chain}
 \end{figure}
 
 Like the other operations, we model attribute accesses using AST nodes in ZipPy.
 We model an attribute read operation using a \texttt{GetAttributeNode} and attribute write operation using a \texttt{SetAttributeNode}.
-Figure~\ref{fig:ch5-attribute-access-dispatch-chain} illustrates the structure of these two nodes.
+Figure~\ref{fig:bg-attribute-access-dispatch-chain} illustrates the structure of these two nodes.
 In each attribute access node, the \textsf{primary} child node represents the primary expression, the component precedes the period in Python's syntax.
 The \textsf{primary} node evaluates to the Python object, on which we perform the attribute access.
-The \textsf{attribute} nodes shown in both Figure~\ref{fig:ch5-get-attribute-node} and~\ref{fig:ch5-set-attribute-node} are dispatch chains that perform the actual read or write on the resolved object.
+The \textsf{attribute} nodes shown in both Figure~\ref{fig:bg-get-attribute-node} and~\ref{fig:bg-set-attribute-node} are dispatch chains that perform the actual read or write on the resolved object.
 
 The attribute access dispatch chain is a linked list of dispatch nodes.
 Each dispatch node has a \textsf{next} field that points to the next dispatch node except for the last one.
@@ -289,7 +291,7 @@ The added entry increases the depth of the inline cache as well as the chance of
 However, if the cache depth reaches a certain threshold, ZipPy rewrites the entire dispatch chain to a single generic dispatch node that always perform a slow path lookup.
 
 Each cache entry in the dispatch chain consists of a cluster of nodes coordinated by the dispatch node.
-Besides the \textsf{next} field pointing to the next node, each dispatch node has a \texttt{LayoutCheckNode} as well as an \texttt{AttributeReadNode} or \texttt{AttributeWriteNode} (Figure~\ref{fig:ch5-attribute-access-dispatch-chain}).
+Besides the \textsf{next} field pointing to the next node, each dispatch node has a \texttt{LayoutCheckNode} as well as an \texttt{AttributeReadNode} or \texttt{AttributeWriteNode} (Figure~\ref{fig:bg-attribute-access-dispatch-chain}).
 The \textsf{check} node stores the cached object layout and performs the layout test.
 The \textsf{read} or \textsf{write} node stores the cached attribute location and performs the actual memory read or write on the primary object.
 When a layout update happens, ZipPy creates a new layout instance for the associated Python object.
@@ -299,27 +301,27 @@ If the cached layout become invalid, it throws an exception back to the parent n
 ZipPy handles the exception by removing the invalid cache entry from the dispatch chain.
 
 \section{Flexible Object Layout Evolution}
-\label{chp:ch6-object}
+\label{sec:impl}
 
 \begin{figure}
 \centering
 \subfigure[Python class \texttt{Point}]{
   \includegraphics[scale=.55]{figures/python-class-point-code}
-  \label{fig:ch5-python-class-point-code}
+  \label{fig:impl-python-class-point-code}
 }
 \subfigure[Generated Java class for \texttt{Point}]{
   \includegraphics[scale=.8]{figures/flexible-object-storage-class-point-code}
-  \label{fig:ch5-flexible-object-storage-class-point-code}
+  \label{fig:impl-flexible-object-storage-class-point-code}
 }
 \caption{Flexible object storage example}
-\label{fig:ch5-flexible-object-storage-example-code}
+\label{fig:impl-flexible-object-storage-example-code}
 \end{figure}
 
 In addition to the fixed object storage, ZipPy also uses a class file generation based approach to produce unique object storages for each Python class at runtime.
-Figure~\ref{fig:ch5-flexible-object-storage-example-code} gives an example of the generated object storage.
-As shown in Figure~\ref{fig:ch5-python-class-point-code}, the simple Python class \texttt{Point} only has two attributes, \texttt{x} and \texttt{y}.
+Figure~\ref{fig:impl-flexible-object-storage-example-code} gives an example of the generated object storage.
+As shown in Figure~\ref{fig:impl-python-class-point-code}, the simple Python class \texttt{Point} only has two attributes, \texttt{x} and \texttt{y}.
 The instantiation of \texttt{Point} shown in the Figure assigns two doubles to \texttt{x} and \texttt{y}.
-Based on this type information, ZipPy generates the Java class \texttt{Point} shown in Figure~\ref{fig:ch5-flexible-object-storage-class-point-code} as the object storage for instances of the Python class.
+Based on this type information, ZipPy generates the Java class \texttt{Point} shown in Figure~\ref{fig:impl-flexible-object-storage-class-point-code} as the object storage for instances of the Python class.
 Note that the generated Java class has two double fields to store the attributes of the Python class.
 We generate the object storage class optimistically assuming that the layout of a Python \texttt{Point} object does not change in the future and the types of its attributes are also stable.
 If our assumption holds, the generated Java class is the optimal object storage tailored specifically for the Python class \texttt{Point}.
@@ -338,7 +340,7 @@ ZipPy uses a specialized constructor call node to perform the first instantiatio
 
 \item Call the resolved constructor, and pass the bootstrapping object as the first argument \textsf{self}.
 
-\item After the constructor call, generate a flexible object storage class based on the current layout of the bootstrapping object similar to the one shown in Figure~\ref{fig:ch5-flexible-object-storage-class-point-code}.
+\item After the constructor call, generate a flexible object storage class based on the current layout of the bootstrapping object similar to the one shown in Figure~\ref{fig:impl-flexible-object-storage-class-point-code}.
 
 \item Create a flexible object storage using the generated storage class, and migrate the attributes from the populated bootstrapping object to the flexible object storage.
 
@@ -351,38 +353,38 @@ ZipPy uses a specialized constructor call node to perform the first instantiatio
 Even though we rely on a fixed object storage to bootstrap the class generation, we discard it immediately after migrating all the attributes to the flexible object storage.
 Therefore, the caller of the Python constructor does not hold reference to the bootstrapping object, and it is in most cases safe to ignore it.
 However, there is a special case where the bootstrapping object is accessed again.
-We will discuss this issue in more detail in Section~\ref{sec:ch5-zombie-resurrection}.
+We will discuss this issue in more detail in Section~\ref{sec:impl-zombie-resurrection}.
 
 Note that the bootstrapping process described above only happens once for each Python class.
 After the successful generation of the flexible storage class, any subsequent attempt to instantiate the same Python class automatically picks up the updated storage class.
 If the Python program does not instantiate a loaded Python class, ZipPy does not generate flexible storage class for it.
 
 \subsection{Continuous Storage Class Generation}
-\label{sec:ch5-flexible-storage-layout-evolution}
+\label{sec:impl-flexible-storage-layout-evolution}
 
 \begin{figure}
 \centering
 \subfigure[Extended Python class \texttt{Point}]{
   \includegraphics[scale=.6]{figures/python-class-point-with-layout-change-code}
-  \label{fig:ch5-python-class-point-with-layout-changecode}
+  \label{fig:impl-python-class-point-with-layout-changecode}
 }
 \subfigure[A loop that uses the \texttt{Point} class]{
   \includegraphics[scale=.6]{figures/python-class-point-used-in-loop-code}
-  \label{fig:ch5-python-class-point-used-in-loop-code}
+  \label{fig:impl-python-class-point-used-in-loop-code}
 }
 \caption{Python object layout change example}
-\label{fig:ch5-python-object-layout-change-example-code}
+\label{fig:impl-python-object-layout-change-example-code}
 \end{figure}
 
 The above mentioned flexible object storage generation rely on a common practice among Python programmers that is do not abuse the mutability of Python objects after its instantiation.
 Since it is permitted by the language, a large portion of Python programs do not strictly follow this practice.
-Figure~\ref{fig:ch5-python-object-layout-change-example-code} shows an updated implementation of the Python class \texttt{Point} that changes its object layout outside the constructor.
+Figure~\ref{fig:impl-python-object-layout-change-example-code} shows an updated implementation of the Python class \texttt{Point} that changes its object layout outside the constructor.
 Note that the new implementation has an additional method called \texttt{addNeighbors}.
 The method inserts a new attribute to the instances of \texttt{Point}.
-A hypothetical loop shown in Figure~\ref{fig:ch5-python-class-point-used-in-loop-code} calls the \texttt{addNeighbors} method in the loop body, and causes a layout change after the instantiation of the class \texttt{Point}.
+A hypothetical loop shown in Figure~\ref{fig:impl-python-class-point-used-in-loop-code} calls the \texttt{addNeighbors} method in the loop body, and causes a layout change after the instantiation of the class \texttt{Point}.
 The behavior of the program shown in the Figure does not follow the suggested coding practice, however, it is in fact commonplace among Python programs.
 
-Although flexible object storage is capable of handling layout changes like the one shown in Figure~\ref{fig:ch5-python-object-layout-change-example-code}, it does so by spilling the new attribute to the spill array.
+Although flexible object storage is capable of handling layout changes like the one shown in Figure~\ref{fig:impl-python-object-layout-change-example-code}, it does so by spilling the new attribute to the spill array.
 A few number of layout changes occurred after the instantiation is enough to cripple the performance advantage of using such a flexible object storage.
 To address this issue we extended flexible object storage generation in ZipPy to support continuous generation of storage classes.
 Every newly generated storage class adopts the layout changes happened so far.
@@ -392,13 +394,13 @@ So if the layout changes converge to a stable point, ZipPy allocates all subsequ
 \centering
 \includegraphics[scale=.45]{figures/constructor-call-site-transformation}
 \caption{Constructor call site transformation}
-\label{fig:ch5-constructor-call-site-transformation}
+\label{fig:impl-constructor-call-site-transformation}
 \end{figure}
 
 ZipPy supports continuous storage class generation by applying a series of node transformations on a constructor call site.
 We implement a number of call node versions specifically for constructor calls or constructor call nodes.
 Each version handles the allocation of the new Python object in a different way.
-Figure~\ref{fig:ch5-constructor-call-site-transformation} shows the various call constructor nodes in ZipPy.
+Figure~\ref{fig:impl-constructor-call-site-transformation} shows the various call constructor nodes in ZipPy.
 The descriptions of each node is as follows:
 
 \begin{itemize}
@@ -413,7 +415,7 @@ The descriptions of each node is as follows:
 
 \end{itemize}
 
-Figure~\ref{fig:ch5-constructor-call-site-transformation} also illustrates the transformations between different call constructor nodes that enables continuous storage class generation.
+Figure~\ref{fig:impl-constructor-call-site-transformation} also illustrates the transformations between different call constructor nodes that enables continuous storage class generation.
 The descriptions of the transformation rules are as follows:
 
 \begin{enumerate}
@@ -447,11 +449,11 @@ Subsequent instantiations of the Python class automatically pick up the update, 
 \centering
 \includegraphics[scale=.49]{figures/object-storage-class-generation-and-object-layout-change}
 \caption{Continuous storage class generations and object layout changes of an example Python class}
-\label{fig:ch5-object-storage-class-generation-and-object-layout-change}
+\label{fig:impl-object-storage-class-generation-and-object-layout-change}
 \end{figure*}
 
 Continuous storage class generation generalizes the existing object model of ZipPy to enable the use of multiple storage classes for a single Python class.
-Figure~\ref{fig:ch5-object-storage-class-generation-and-object-layout-change} illustrates the transitions of storage classes and object layouts of an example Python class during the life time of the class.
+Figure~\ref{fig:impl-object-storage-class-generation-and-object-layout-change} illustrates the transitions of storage classes and object layouts of an example Python class during the life time of the class.
 In the object model described previously where we only use fixed storage classes to model Python objects, an object layout change at runtime triggers a transition vertically in the Figure.
 Whereas with continuous storage class generation an object layout change also triggers a storage class regeneration along the horizontal direction in the Figure.
 The transitions of the storage classes are orthogonal to that of the object layouts.
@@ -467,7 +469,7 @@ A storage class generation caused by an object layout change only benefits Pytho
 The living or existing objects of the same Python class handle layout changes lazily by spilling the new attribute to the spill array and updating its own layout table.
 Note that similar to the fixed object layout approach, we synchronize object layout changes across all the Python objects allocated using the same storage class.
 We will use a program execution example to further explain the object layout synchronizations.
-For instance, along the execution of a hypothetical Python program, the program at one point allocates two Python object \textsf{A} and \textsf{B} both using the storage class \texttt{Flexible 0} shown in Figure~\ref{fig:ch5-object-storage-class-generation-and-object-layout-change}.
+For instance, along the execution of a hypothetical Python program, the program at one point allocates two Python object \textsf{A} and \textsf{B} both using the storage class \texttt{Flexible 0} shown in Figure~\ref{fig:impl-object-storage-class-generation-and-object-layout-change}.
 Since Python object instantiation always picks up the latest storage class, \texttt{Flexible 0} is the most current storage class at this point.
 Both \textsf{A} and \textsf{B} only have a single attribute \texttt{a}.
 At a later point, an object layout takes place by adding an attribute \texttt{b} to the object \textsf{A}.
@@ -478,26 +480,26 @@ After the layout synchronization, even though object \textsf{B} does not actuall
 Note that the above mentioned layout change also signals the Python class to generate storage class \texttt{Flexible 1}.
 However, object \textsf{A} and \textsf{B} will not migrate to another storage class and always synchronize its with \texttt{Flexible 0} to share the same object layout.
 
-Object layout synchronization simplifies the attribute access dispatch we explained in Section~\ref{sec:ch5-attribute-access-dispatch-chain}.
+Object layout synchronization simplifies the attribute access dispatch we explained in Section~\ref{sec:bg-attribute-access-dispatch-chain}.
 It ensures that we only need to maintain a single valid cache entry to access Python objects allocated using the same storage class.
 However, in its life time, a Python class could generate multiple storage classes.
 It is inevitable that at the same program location we need to built multiple cache entries, one for each storage class, to optimize accesses to Python objects of the same class.
 
 \subsection{Zombie Resurrection}
-\label{sec:ch5-zombie-resurrection}
+\label{sec:impl-zombie-resurrection}
 
 \begin{figure}
 \centering
 \includegraphics[scale=.6]{figures/python-class-point-with-zombie-store-code}
 \caption{A Python constructor that exposes a reference to \texttt{self}}
-\label{fig:ch5-python-class-point-with-zombie-store-code}
+\label{fig:impl-python-class-point-with-zombie-store-code}
 \end{figure}
 
 We uses a fixed object storage to bootstrap the initial storage class generation.
 But we only return the instantiated Python object to the caller of the constructor after migrating to a flexible object storage and discarding the initial fixed one.
 This approach ensures that the consumer of the constructor call only references the flexible object storage.
 However, there are cases where the constructor itself could expose the reference to the fixed object storage making it accessible outside the constructor.
-Figure~\ref{fig:ch5-python-class-point-with-zombie-store-code} shows a modified definition of the Python class \texttt{Point}.
+Figure~\ref{fig:impl-python-class-point-with-zombie-store-code} shows a modified definition of the Python class \texttt{Point}.
 The constructor of \texttt{Point} stores a reference to \texttt{self} to the Python list \texttt{board}.
 The reference store makes potential accesses to \texttt{self} possible outside the constructor.
 So during the storage class bootstrapping of \texttt{Point}, the shown reference store of \texttt{self} will make the bootstrapping object modeled using the fixed object storage accessible at a later point.
@@ -522,17 +524,17 @@ The compiler is able to apply aggressive optimizations such as escape analysis t
 When combined with flexible storage class generation, our object model design offers both performance and space efficiency that closes the gap between the guest language and the host language.
 
 \section{Evalutation}
+\label{sec:eval}
 
-To fully assess the effectiveness of the optimizations we discussed in the Chapter~\ref{chp:ch6-object}, we evaluate the performance of ZipPy in the following steps:
+To fully assess the effectiveness of the optimizations we discussed in the Section~\ref{sec:impl}, we evaluate the performance of ZipPy in the following steps:
 First we evaluate the overall performance of ZipPy by running a selection of conventional benchmarks.
 These benchmarks are popular among the virtual machine research and Python communities.
 They provide a good indication of the overall performance of a programming language implementation.
-Second we examine the effectiveness of generator peeling using a set of real world and generator intensive Python programs.
-As the last step, we analyze the performance and space impact of using flexible object storage generation in ZipPy.
+As the next step, we analyze the performance and space impact of using flexible object storage generation in ZipPy.
 We organize our extensive performance experiments by comparing ZipPy with the existing Python VMs.
 
 \section{The Performance of ZipPy}
-\label{sec:ch6-performance-of-zippy}
+\label{sec:eval-performance-of-zippy}
 
 \subsection{Experiment Setup}
 
@@ -590,7 +592,7 @@ This allows us to properly measure peak performance.
     \bottomrule
   \end{tabular}
     \caption{Benchmarks selection}
-    \label{tab:ch6-regular-benchmark-selection}
+    \label{tab:eval-regular-benchmark-selection}
   \end{center}
 \end{table*}
 
@@ -610,7 +612,7 @@ Its benchmark suite is well-regarded in the Python community.
 
 \end{itemize}
 
-Table~\ref{tab:ch6-regular-benchmark-selection} summarizes the benchmarks we selected in this experiment from the above mentioned suites.
+Table~\ref{tab:eval-regular-benchmark-selection} summarizes the benchmarks we selected in this experiment from the above mentioned suites.
 Since we focus on the overall performance of Python VMs, we intentionally leave out benchmarks that are sensitive to the performance of generators.
 We selected benchmarks that are written in both imperative and object oriented styles.
 
@@ -639,7 +641,7 @@ We selected benchmarks that are written in both imperative and object oriented s
   \bottomrule
   \end{tabular}
   \caption{The scores of Python VMs running regular benchmarks}
-  \label{tab:ch6-regular-benchmarks-scores}
+  \label{tab:eval-regular-benchmarks-scores}
   \end{center}
 \end{table*}
 
@@ -667,11 +669,11 @@ We selected benchmarks that are written in both imperative and object oriented s
   \bottomrule
   \end{tabular}
   \caption{The speedups of Python VMs normalized to CPython3 running regular benchmarks}
-  \label{tab:ch6-regular-benchmarks-speedups}
+  \label{tab:eval-regular-benchmarks-speedups}
   \end{center}
 \end{table*}
 
-Table~\ref{tab:ch6-regular-benchmarks-scores} and~\ref{tab:ch6-regular-benchmarks-speedups} shows the results of our experiments.
+Table~\ref{tab:eval-regular-benchmarks-scores} and~\ref{tab:eval-regular-benchmarks-speedups} shows the results of our experiments.
 We use a score system to gauge VM performance.
 We calculate the score by dividing $1000$ by the execution time of the benchmark.
 A score system is more intuitive than execution times for visualization purpose.
@@ -679,10 +681,10 @@ It also offers a higher resolution for our performance measurements.
 We carefully chose the program inputs such that the resulting scores stay in the range between $10$ and $1000$.
 Larger inputs have limited impacts on the speedups our of optimization.
 
-Table~\ref{tab:ch6-regular-benchmarks-scores} shows the average scores of each Python VM running the selected benchmarks.
-Table~\ref{tab:ch6-regular-benchmarks-speedups} shows the average speedups of each VM against CPython3.
-We calculate the speedups by normalizing the scores of each VM shown in Table~\ref{tab:ch6-regular-benchmarks-scores} against that of CPython3.
-The last row of Table~\ref{tab:ch6-regular-benchmarks-speedups} shows the geometric mean of the speedups of each Python VM relative to CPython3.
+Table~\ref{tab:eval-regular-benchmarks-scores} shows the average scores of each Python VM running the selected benchmarks.
+Table~\ref{tab:eval-regular-benchmarks-speedups} shows the average speedups of each VM against CPython3.
+We calculate the speedups by normalizing the scores of each VM shown in Table~\ref{tab:eval-regular-benchmarks-scores} against that of CPython3.
+The last row of Table~\ref{tab:eval-regular-benchmarks-speedups} shows the geometric mean of the speedups of each Python VM relative to CPython3.
 As shown in the Table, the average speedup of ZipPy over CPython3 is $\zippyToCPythonRegular{}\times$ with the highest speedup over $128\times$ on \textsf{spectralnorm}.
 Note that the performance of ZipPy running the selected benchmarks is even higher than PyPy by around $26\%$
 
@@ -727,11 +729,11 @@ Here we extend our experiments and evaluates the implementation of flexible obje
 We do so by comparing the time and space efficiency between the different object model configurations in ZipPy.
 We select a number of object-bound benchmarks from our comprehensive benchmark selection for this particular experiments.
 Those benchmarks includes: \textsf{float}, \textsf{richards}, \textsf{chaos}, \textsf{deltablue} and \textsf{go}.
-We used the same experiment setup as mentioned previously in Section~\ref{sec:ch6-performance-of-zippy}.
+We used the same experiment setup as mentioned previously in Section~\ref{sec:eval-performance-of-zippy}.
 
 \subsection{Object Model Configurations}
 
-As we discussed in Chapter~\ref{chp:ch6-object}, a fixed object storage has a fixed number of fields to stores Python object attributes.
+As we discussed in Section~\ref{sec:impl}, a fixed object storage has a fixed number of fields to stores Python object attributes.
 To accommodate attributes modeled using Java primitive types, a fixed object storage needs to have fields of different types, such as Java \textsf{int}, \textsf{double} and \textsf{Object}.
 In our experiment, we use fixed object storages that have equal number of fields of each of these three types.
 Note that we cannot mix the fields of different types, since the binary representation of each type varies in different JVM implementations.
@@ -755,10 +757,10 @@ In flexible object storage with continuous generation, we always generate a new 
 \centering
 \includegraphics[scale=.3, page=4]{benchmarks/object-model-results}
 \caption{Detailed speedups of different object model configurations normalized to fixed object storage of size $5$}
-\label{fig:ch6-object-model-config-speedup}
+\label{fig:eval-object-model-config-speedup}
 \end{figure*}
 
-Figure~\ref{fig:ch6-object-model-config-speedup} shows the performance of each object model configuration running the selected benchmarks normalized to the fixed object storage.
+Figure~\ref{fig:eval-object-model-config-speedup} shows the performance of each object model configuration running the selected benchmarks normalized to the fixed object storage.
 With flexible object storage enabled we discover speedups when running the majority of the benchmarks with the highest speedup of $14\%$ on \textsf{chaos}.
 The average speedup of using flexible object storage is $2$ to $3\%$.
 We also notice a slowdown on \textsf{richards}.
@@ -783,7 +785,7 @@ We expect that using a newer version of Truffle with updated inlining heuristics
 
 A fixed object storage configuration is always biased.
 A single size configuration cannot work well for all Python programs let alone the fixed type distribute among the fields of an object storage.
-Even with a high size setting, using fixed object storage is $14\%$ slower than the flexible approach as shown in Figure~\ref{fig:ch6-object-model-config-speedup}.
+Even with a high size setting, using fixed object storage is $14\%$ slower than the flexible approach as shown in Figure~\ref{fig:eval-object-model-config-speedup}.
 The reason behind is the allocation of large Python objects.
 Any attribute that cannot fit into the fixed object storage is stored in the spill array.
 The additional memory access incurred by accessing the spill array causes a slowdown on the benchmark.
@@ -794,19 +796,19 @@ The additional memory access incurred by accessing the spill array causes a slow
 \centering
 \includegraphics[scale=.27, page=5]{benchmarks/object-model-results}
 \caption{The memory overheads of fixed object storage of size $1$, $3$ and $5$ relative to flexible storage allocation with continuous generation}
-\label{fig:ch6-fixed-object-storage-space-overhead}
+\label{fig:eval-fixed-object-storage-space-overhead}
 \end{figure}
 
 \begin{figure}
 \centering
 \includegraphics[scale=.27, page=6]{benchmarks/object-model-results}
 \caption{The slowdowns of fixed object storage of size $1$, $3$ and $5$ relative to flexible storage allocation with continuous generation}
-\label{fig:ch6-fixed-object-storage-slowdown}
+\label{fig:eval-fixed-object-storage-slowdown}
 \end{figure}
 
 We measured the memory space used to allocate fixed object storages for each selected benchmark with three distinct size settings: one, three and five.
 We compare the memory space numbers with the equivalent measured using flexible object storage with continuous generation enabled.
-Figure~\ref{fig:ch6-fixed-object-storage-space-overhead} shows the results of this experiment normalized to the memory space usage of flexible object storage.
+Figure~\ref{fig:eval-fixed-object-storage-space-overhead} shows the results of this experiment normalized to the memory space usage of flexible object storage.
 Using a fixed object storage of size one allocates on average $1.63\times$ more memory than using flexible object storage.
 Using a fixed object storage of size five allocates up to $3.6\times$ more memory than using the flexible configuration.
 
@@ -818,7 +820,7 @@ This multi-variant fixed object storage solution, even in an ideal case, cannot 
 
 We also measured the slowdown of using a fixed object storage running the benchmarks compared to using flexible object storages.
 The fixed object storage configurations used in our experiment includes the following size settings: one, three and five.
-Figure~\ref{fig:ch6-fixed-object-storage-slowdown} shows the slowdowns of using various fixed object storages.
+Figure~\ref{fig:eval-fixed-object-storage-slowdown} shows the slowdowns of using various fixed object storages.
 Overall we observe slowdowns ranging from $2$ to $20\%$ in the results.
 The smaller the fixed object storage size the higher the slowdown.
 Using a fixed object storage of size one causes a slowdown up to $20\%$ on \textsf{chaos}.
